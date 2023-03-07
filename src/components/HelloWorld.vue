@@ -1,58 +1,106 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
+  <div>
+    <div class="chat-log">
+      <div class="message" v-for="message in messages" :key="message._id">
+        <span v-if="message.user">{{ message.user }}:</span>
+        <span>{{ message.ai }}</span>
+        <button v-if="message._id" @click="deleteMessage(message._id)">Delete</button>
+      </div>
+    </div>
+    <form @submit.prevent="handleSubmit">
+      <input type="text" v-model="inputText" placeholder="Enter your message...">
+      <button type="submit">Send</button>
+    </form>
   </div>
 </template>
 
 <script>
+import { reactive, onMounted } from 'vue';
+import axios from 'axios';
+import { Configuration, OpenAIApi }  from "openai";
 export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
+  name: 'app',
+  setup() {
+    const state = reactive({
+      messages: [],
+      inputText: ''
+    });
+
+    const getResponseFromAI = async () => {
+      const configuration = new Configuration({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+      const openai = new OpenAIApi(configuration);
+
+      const response = await openai.createCompletion({
+        model: "text-davinci-003",
+        prompt: "Convert this text to a programmatic command:\n\nExample: Ask Constance if we need some bread\nOutput: send-msg `find constance` Do we need some bread?\n\nReach out to the ski store and figure out if I can get my skis fixed before I leave on Thursday",
+        temperature: 0,
+        max_tokens: 100,
+        top_p: 1.0,
+        frequency_penalty: 0.2,
+        presence_penalty: 0.0,
+        stop: ["\n"],
+      });
+      state.messages.push(response.data);
+    }
+
+    const getChatResponses = async () => {
+      try {
+        const response = await axios.get(process.env.VUE_APP_API_ENDPOINT + '/getChatResponses');
+        state.messages = response.data;
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const createChatResponse = async () => {
+      if (!state.inputText) {
+        return;
+      }
+
+      try {
+        await getResponseFromAI();
+        await axios.post(process.env.VUE_APP_API_ENDPOINT +  + '/createChatResponse', { user: 'User', ai: state.inputText });
+        // state.messages.push(response.data);
+        state.inputText = '';
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const deleteChatResponse = async (id) => {
+      try {
+        await axios.delete(process.env.VUE_APP_API_ENDPOINT + `/deleteChatResponse/${id}`);
+        state.messages = state.messages.filter(message => message._id !== id);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    onMounted(getChatResponses);
+
+    return {
+      state,
+      createChatResponse,
+      deleteChatResponse
+    };
   }
 }
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
-h3 {
-  margin: 40px 0 0;
+<style>
+.chat-log {
+  height: 300px;
+  overflow-y: auto;
 }
-ul {
-  list-style-type: none;
-  padding: 0;
+.message {
+  margin: 10px;
+  padding: 10px;
+  background-color: #f2f2f2;
+  border-radius: 5px;
 }
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
-  color: #42b983;
+button {
+  margin-left: 10px;
 }
 </style>
