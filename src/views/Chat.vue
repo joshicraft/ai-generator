@@ -3,7 +3,7 @@
     <h1>Chat</h1>
     <div v-for="message in messages" :key="message.id">
       {{ message.text }}
-      <button @click="deleteMessage(message.id)">Delete</button>
+      <button @click="deleteMessage(message.id)">Delete Now</button>
       <button @click="regenerateMessage(message.id)">Regenerate</button>
     </div>
     <form @submit.prevent="sendMessage">
